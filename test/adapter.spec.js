@@ -367,12 +367,17 @@ describe('jasmine adapter', function () {
     })
 
     it('should set random order', function () {
-      jasmineConfig.random = true
+      jasmineConfig.random = false
       spyOn(jasmineEnv, 'randomizeTests')
 
       createStartFn(tc, jasmineEnv)()
 
-      expect(jasmineEnv.randomizeTests).toHaveBeenCalledWith(true)
+      if (jasmineEnv.configuration) {
+        expect(jasmineEnv.configuration().random).toBe(false)
+        expect(jasmineEnv.randomizeTests).not.toHaveBeenCalled()
+      } else {
+        expect(jasmineEnv.randomizeTests).toHaveBeenCalledWith(false)
+      }
     })
 
     it('should set order seed', function () {
@@ -383,7 +388,12 @@ describe('jasmine adapter', function () {
 
       createStartFn(tc, jasmineEnv)()
 
-      expect(jasmineEnv.seed).toHaveBeenCalledWith(seed)
+      if (typeof jasmineEnv.configuration === 'function') {
+        expect(jasmineEnv.configuration().seed).toBe(seed)
+        expect(jasmineEnv.seed).not.toHaveBeenCalled()
+      } else {
+        expect(jasmineEnv.seed).toHaveBeenCalledWith(seed)
+      }
     })
 
     it('should set stopOnFailure', function () {
@@ -392,7 +402,12 @@ describe('jasmine adapter', function () {
 
       createStartFn(tc, jasmineEnv)()
 
-      expect(jasmineEnv.throwOnExpectationFailure).toHaveBeenCalledWith(true)
+      if (typeof jasmineEnv.configuration === 'function') {
+        expect(jasmineEnv.configuration().oneFailurePerSpec).toBe(true)
+        expect(jasmineEnv.throwOnExpectationFailure).not.toHaveBeenCalled()
+      } else {
+        expect(jasmineEnv.throwOnExpectationFailure).toHaveBeenCalledWith(true)
+      }
     })
 
     it('should set failFast', function () {
@@ -401,7 +416,12 @@ describe('jasmine adapter', function () {
 
       createStartFn(tc, jasmineEnv)()
 
-      expect(jasmineEnv.stopOnSpecFailure).toHaveBeenCalledWith(true)
+      if (typeof jasmineEnv.configuration === 'function') {
+        expect(jasmineEnv.configuration().failFast).toBe(true)
+        expect(jasmineEnv.stopOnSpecFailure).not.toHaveBeenCalled()
+      } else {
+        expect(jasmineEnv.stopOnSpecFailure).toHaveBeenCalledWith(true)
+      }
     })
 
     it('should change timeoutInterval', function () {
@@ -601,18 +621,33 @@ describe('jasmine adapter', function () {
   })
 
   describe('createSpecFilter', function () {
+    var jasmineEnv
+
+    beforeEach(function () {
+      jasmineEnv = new jasmine.Env()
+    })
+
     it('should create spec filter in jasmine', function () {
-      var jasmineEnvMock = {}
       var karmaConfMock = {
         args: ['--grep', 'test']
       }
-      var specMock = {
+
+      createSpecFilter(karmaConfMock, jasmineEnv)
+
+      var specFilter = typeof jasmineEnv.configuration === 'function'
+        ? jasmineEnv.configuration().specFilter
+        : jasmineEnv.specFilter
+
+      // Jasmine's default specFilter **always** returns true
+      // so test multiple possibilities
+
+      expect(specFilter({
         getFullName: jasmine.createSpy('getFullName').and.returnValue('test')
-      }
+      })).toEqual(true)
 
-      createSpecFilter(karmaConfMock, jasmineEnvMock)
-
-      expect(jasmineEnvMock.specFilter(specMock)).toEqual(true)
+      expect(specFilter({
+        getFullName: jasmine.createSpy('getFullName2').and.returnValue('foo')
+      })).toEqual(false)
     })
   })
 })

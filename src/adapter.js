@@ -326,14 +326,20 @@ var KarmaSpecFilter = function (options) {
  * @param {Object} jasmineEnv jasmine environment object
  */
 var createSpecFilter = function (config, jasmineEnv) {
-  var specFilter = new KarmaSpecFilter({
+  var karmaSpecFilter = new KarmaSpecFilter({
     filterString: function () {
       return getGrepOption(config.args)
     }
   })
 
-  jasmineEnv.specFilter = function (spec) {
-    return specFilter.matches(spec.getFullName())
+  var specFilter = function (spec) {
+    return karmaSpecFilter.matches(spec.getFullName())
+  }
+
+  if (typeof jasmineEnv.configure === 'function') {
+    jasmineEnv.configure({ specFilter: specFilter })
+  } else {
+    jasmineEnv.specFilter = specFilter
   }
 }
 
@@ -355,10 +361,29 @@ function createStartFn (karma, jasmineEnv) {
 
     jasmineEnv = jasmineEnv || window.jasmine.getEnv()
 
-    setOption(jasmineConfig.stopOnFailure, jasmineEnv.throwOnExpectationFailure)
-    setOption(jasmineConfig.failFast, jasmineEnv.stopOnSpecFailure)
-    setOption(jasmineConfig.seed, jasmineEnv.seed)
-    setOption(jasmineConfig.random, jasmineEnv.randomizeTests)
+    if (typeof jasmineEnv.configure === 'function') {
+      // it is actually possible to pass jasmineConfig directly to `jasmine.configure`,
+      // but that would break karma-jasmine's documented use of `stopOnFailure`
+      // which is not a valid jasmine config option
+
+      if (jasmineConfig.hasOwnProperty('stopOnFailure')) {
+        jasmineEnv.configure({ oneFailurePerSpec: jasmineConfig.stopOnFailure })
+      }
+      if (jasmineConfig.hasOwnProperty('failFast')) {
+        jasmineEnv.configure({ failFast: jasmineConfig.failFast })
+      }
+      if (jasmineConfig.hasOwnProperty('seed')) {
+        jasmineEnv.configure({ seed: jasmineConfig.seed })
+      }
+      if (jasmineConfig.hasOwnProperty('random')) {
+        jasmineEnv.configure({ random: jasmineConfig.random })
+      }
+    } else {
+      setOption(jasmineConfig.stopOnFailure, jasmineEnv.throwOnExpectationFailure)
+      setOption(jasmineConfig.failFast, jasmineEnv.stopOnSpecFailure)
+      setOption(jasmineConfig.seed, jasmineEnv.seed)
+      setOption(jasmineConfig.random, jasmineEnv.randomizeTests)
+    }
 
     window.jasmine.DEFAULT_TIMEOUT_INTERVAL = jasmineConfig.timeoutInterval ||
        window.jasmine.DEFAULT_TIMEOUT_INTERVAL
